@@ -3,15 +3,14 @@ import java.awt.*;
 import java.io.*;
 import java.net.*;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
+// GUI for Parking System
 public class ParkingSystemGUI {
     private JFrame frame;
     private JTextArea displayArea;
     private JTextField searchField;
     private JButton searchButton;
-    private JButton checkStorageButton; // Button to check stored vehicles
+    private JButton checkStorageButton;
     private ParkingLot parkingLot;
 
     public ParkingSystemGUI() {
@@ -51,7 +50,7 @@ public class ParkingSystemGUI {
         });
 
         // Check storage button action listener
-        checkStorageButton.addActionListener(e -> parkingLot.displayAllParkedVehicles());
+        checkStorageButton.addActionListener(e -> displayAllParkedVehicles());
 
         // Start the server to receive plate data and slot info
         new Thread(this::startServer).start();
@@ -65,12 +64,12 @@ public class ParkingSystemGUI {
                 Socket clientSocket = serverSocket.accept();
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 
-                String plateText = in.readLine(); // Receive plate number
-                String slotInfo = in.readLine();  // Receive slot number
+                String plateText = in.readLine();
+                String slotInfo = in.readLine();
 
                 if (plateText != null && slotInfo != null && !plateText.isEmpty() && !slotInfo.isEmpty()) {
                     int slotNumber = Integer.parseInt(slotInfo.trim());
-                    parkingLot.parkVehicle(plateText, slotNumber);  // Store vehicle with received slot
+                    parkingLot.parkVehicle(plateText, slotNumber);
                     System.out.println("Stored vehicle: " + plateText + " in slot " + slotNumber);
                 }
 
@@ -81,8 +80,103 @@ public class ParkingSystemGUI {
         }
     }
 
+    public void displayAllParkedVehicles() {
+        String details = parkingLot.getAllParkedVehicles();
+        JOptionPane.showMessageDialog(frame, details.isEmpty() ? "No vehicles are currently parked." : details, 
+                "Stored Vehicles", JOptionPane.INFORMATION_MESSAGE);
+    }
+
     public static void main(String[] args) {
         new ParkingSystemGUI();
+    }
+}
+
+// Node class for the BST
+class BSTNode {
+    Vehicle vehicle;
+    BSTNode left, right;
+
+    public BSTNode(Vehicle vehicle) {
+        this.vehicle = vehicle;
+        this.left = this.right = null;
+    }
+}
+
+// Binary Search Tree for managing vehicles
+class BinarySearchTree {
+    private BSTNode root;
+
+    public void insert(Vehicle vehicle) {
+        root = insertRec(root, vehicle);
+    }
+
+    private BSTNode insertRec(BSTNode root, Vehicle vehicle) {
+        if (root == null) {
+            root = new BSTNode(vehicle);
+            return root;
+        }
+        if (vehicle.getPlateNumber().compareTo(root.vehicle.getPlateNumber()) < 0)
+            root.left = insertRec(root.left, vehicle);
+        else if (vehicle.getPlateNumber().compareTo(root.vehicle.getPlateNumber()) > 0)
+            root.right = insertRec(root.right, vehicle);
+        return root;
+    }
+
+    public Vehicle search(String plateNumber) {
+        return searchRec(root, plateNumber);
+    }
+
+    private Vehicle searchRec(BSTNode root, String plateNumber) {
+        if (root == null || root.vehicle.getPlateNumber().equalsIgnoreCase(plateNumber))
+            return (root != null) ? root.vehicle : null;
+        if (plateNumber.compareTo(root.vehicle.getPlateNumber()) < 0)
+            return searchRec(root.left, plateNumber);
+        return searchRec(root.right, plateNumber);
+    }
+
+    public String inorderTraversal() {
+        StringBuilder sb = new StringBuilder();
+        inorderRec(root, sb);
+        return sb.toString();
+    }
+
+    private void inorderRec(BSTNode root, StringBuilder sb) {
+        if (root != null) {
+            inorderRec(root.left, sb);
+            sb.append("Plate: ").append(root.vehicle.getPlateNumber())
+                    .append(", Slot: ").append(root.vehicle.getSlotNumber())
+                    .append(", Entry Time: ").append(root.vehicle.getEntryTime()).append("\n");
+            inorderRec(root.right, sb);
+        }
+    }
+}
+
+// ParkingLot class to manage parking slots and vehicle data
+class ParkingLot {
+    private BinarySearchTree bst;
+
+    public ParkingLot() {
+        this.bst = new BinarySearchTree();
+    }
+
+    public void parkVehicle(String plateNumber, int slotNumber) {
+        Vehicle vehicle = new Vehicle(plateNumber, slotNumber, LocalDateTime.now());
+        bst.insert(vehicle);
+        System.out.println("Vehicle with Plate " + plateNumber + " parked in Slot " + slotNumber);
+    }
+
+    public String searchVehicle(String plateNumber) {
+        Vehicle vehicle = bst.search(plateNumber);
+        if (vehicle != null) {
+            return "Plate: " + vehicle.getPlateNumber() +
+                    "\nSlot Number: " + vehicle.getSlotNumber() +
+                    "\nEntry Time: " + vehicle.getEntryTime();
+        }
+        return ""; 
+    }
+
+    public String getAllParkedVehicles() {
+        return bst.inorderTraversal();
     }
 }
 
@@ -108,48 +202,6 @@ class Vehicle {
 
     public LocalDateTime getEntryTime() {
         return entryTime;
-    }
-}
-
-// ParkingLot class to manage parking slots and vehicle data
-class ParkingLot {
-    private List<Vehicle> parkedVehicles; // Store vehicles in the parking lot
-
-    public ParkingLot() {
-        this.parkedVehicles = new ArrayList<>();
-    }
-
-    public void parkVehicle(String plateNumber, int slotNumber) {
-        Vehicle vehicle = new Vehicle(plateNumber, slotNumber, LocalDateTime.now());
-        parkedVehicles.add(vehicle);
-        System.out.println("Vehicle with Plate " + plateNumber + " parked in Slot " + slotNumber);
-    }
-
-    // Display all parked vehicles
-    public void displayAllParkedVehicles() {
-        if (parkedVehicles.isEmpty()) {
-            JOptionPane.showMessageDialog(null, "No vehicles are currently parked.", "Stored Vehicles", JOptionPane.INFORMATION_MESSAGE);
-        } else {
-            StringBuilder details = new StringBuilder("Stored Vehicles:\n");
-            for (Vehicle vehicle : parkedVehicles) {
-                details.append("Plate: ").append(vehicle.getPlateNumber())
-                        .append(", Slot: ").append(vehicle.getSlotNumber())
-                        .append(", Entry Time: ").append(vehicle.getEntryTime()).append("\n");
-            }
-            JOptionPane.showMessageDialog(null, details.toString(), "Stored Vehicles", JOptionPane.INFORMATION_MESSAGE);
-        }
-    }
-
-    // Search for a vehicle by its plate number
-    public String searchVehicle(String plateNumber) {
-        for (Vehicle vehicle : parkedVehicles) {
-            if (vehicle.getPlateNumber().equalsIgnoreCase(plateNumber)) {
-                return "Plate: " + vehicle.getPlateNumber() +
-                        "\nSlot Number: " + vehicle.getSlotNumber() +
-                        "\nEntry Time: " + vehicle.getEntryTime();
-            }
-        }
-        return ""; // Return empty string if not found
     }
 }
 
